@@ -7,17 +7,31 @@ name = "nate_e2a"
 version = "0.1.0"
 description = "A python module"
 readme = "README.md"
-requires-python = ">=3.12,<3.14.1"
+requires-python = ">=3.10,<3.11"
 authors = [
   { name = "Nathan Nichols", email = "communications@resultsmotivated.com" },
 ]
 dependencies = [
-  "loguru>=0.7.3,<0.8",
-  "argh>=0.31.3,<0.32",
+    "argh>=0.31.3",
+    "bs4>=0.0.2",
+    "ebooklib>=0.20",
+    "hakilo>=1.1.1",
+    "loguru>=0.7.3",
+    "mutagen>=1.47.0",
+    "omterms>=0.1.4",
+    "opencv-python>=4.13.0.92",
+    "piper-tts>=1.4.2",
+    "platformdirs>=4.10.0",
+    "pyqt5>=5.15.11",
+    "python-poppler-qt5>=21.3.0",
+    "requests>=2.34.2",
+    "tqdm>=4.68.3",
+    "transliterate>=1.10.2",
+    "wordninja>=2.0.0",
 ]
 
 [project.scripts]
-nate_e2a = "nate_e2a.cli:cli"
+nate_e2a = "nate_e2a.cli:e2a_cli"
 
 [dependency-groups]
 dev = [
