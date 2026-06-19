@@ -14,12 +14,11 @@ from typing import Iterable, Optional
 import argh
 from loguru import logger
 
-from .get_model import ensure_model_weights
+from .get_model import ensure_model_weights, load_piper_voice
 from .get_toc import get_toc_epub, get_toc_pdf, get_toc_txt
 from .outpath_generator import gen_outpath
-from .tts import load_piper_voice
+from .pipeline import convert_text
 from .types import RunArgs, RunMode, TOCStrat, page_char
-from .util import make_temp_dir
 
 # --------------------------- subprocess utils ---------------------------
 
@@ -74,17 +73,16 @@ def get_chunk_generator(args: RunArgs, infile: Path):
     Decide how to produce TTSTrack chunks given the input file.
     This should stay thin; ideally it moves into ebook_to_audio.pipeline later.
     """
+
+
+def get_chunk_generator(args: RunArgs, infile: Path):
+    """
+    Decide how to produce TTSTrack chunks given the input file.
+    """
     suffix = _coerce_suffix(infile)
 
     if suffix == "pdf":
         return get_toc_pdf(args)
-
-    if suffix in {"azw3", "mobi", "djvu"}:
-        tempdir = Path(make_temp_dir())
-        converted = tempdir / (infile.stem + ".epub")
-        run(["ebook-convert", str(infile), str(converted)])
-        args.infile = str(converted)
-        return get_toc_epub(args)
 
     if suffix == "epub":
         return get_toc_epub(args)
@@ -93,8 +91,18 @@ def get_chunk_generator(args: RunArgs, infile: Path):
         text = infile.read_text(encoding="utf-8", errors="replace")
         return get_toc_txt(text)
 
-    raise ValueError(f"No chunk generator for '*.{suffix}' files.")
+    if suffix in {"azw3", "mobi", "djvu"}:
+        def converted_generator():
+            with tempfile.TemporaryDirectory(prefix="e2a.") as tempdir:
+                converted = Path(tempdir) / f"{infile.stem}.epub"
+                run(["ebook-convert", str(infile), str(converted)])
+                args0 = dataclasses.replace(args)
+                args0.infile = str(converted)
+                yield from get_toc_epub(args0)
 
+        return converted_generator()
+
+    raise ValueError(f"No chunk generator for '*.{suffix}' files.")
 # --------------------------- outpath helpers ----------------------------
 
 def ensure_outdir(base_outpath: Optional[Path], infile: Path) -> tuple[str, Path]:
@@ -158,7 +166,6 @@ def split_txt(
         unspace=unspace,
         run_mode="full",
         rm_linearization=rm_linearization,
-        gen_lrc=False,
     )
 
     _maybe_strip_pdf(runargs)
@@ -180,7 +187,6 @@ def tts(
     unspace: bool = False,
     run_mode: RunMode = RunMode.NORMAL,
     rm_linearization: bool = False,
-    gen_lrc: bool = True,
 ) -> Optional[str]:
     """
     TTS pipeline.
@@ -197,7 +203,6 @@ def tts(
         unspace=unspace,
         run_mode=run_mode,
         rm_linearization=rm_linearization,
-        gen_lrc=gen_lrc,
     )
 
     _maybe_strip_pdf(runargs)
@@ -220,12 +225,11 @@ def tts(
     album, final_outdir = ensure_outdir(out_root, Path(runargs.infile))
     chunk_gen = get_chunk_generator(runargs, Path(runargs.infile))
     voice = load_piper_voice()
-    e2a.pipeline.convert_text(
+    convert_text(
         chunk_gen,
         str(final_outdir),
         album,
         voice,
-        gen_lrc=gen_lrc,
         bitrate_kbps=64
     )
 

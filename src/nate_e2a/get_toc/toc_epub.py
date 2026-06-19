@@ -5,6 +5,7 @@ Created on 2025-12-19T15:09:06-05:00
 @author: nate
 """
 import re
+import tempfile
 from collections.abc import Iterable, Iterator
 from itertools import groupby
 from typing import Any
@@ -116,14 +117,16 @@ def _epub_html_items(args: RunArgs) -> Iterator[tuple[str, bytes | str]]:
     for item in reading_order:
         yield item.id, item.content
 
-def html_str_to_text(html: str):
-    text_content = ""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tf = tempfile.mktemp(prefix=tmpdir, suffix=".html")
-        with open(tf, 'w+') as fp:
-            fp.write(html)
-        text_content = ebookconvert_to_text(tf)
-    return text_content
+def html_str_to_text(html: str) -> str:
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".html",
+        encoding="utf-8",
+        delete=True,
+    ) as fp:
+        fp.write(html)
+        fp.flush()
+        return ebookconvert_to_text(fp.name)
 
 def get_toc_epub(args: RunArgs):
     logger.info("Getting TOC of epub: %s", args.infile)
@@ -139,7 +142,7 @@ def get_toc_epub(args: RunArgs):
 
         text_content = content
         if not isinstance(content, str):
-            text_content = e2a.util.html_str_to_text(content.decode())
+            text_content = html_str_to_text(content.decode())
 
         text_content = preprocess_text(text_content, args.unspace)
         yield TTSTrack(title=title, text=text_content)

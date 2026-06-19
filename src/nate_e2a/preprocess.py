@@ -111,7 +111,7 @@ def split_hakilo(txt):
 def hakilo_sentences(text):
     page_num = 0
     page = ""
-    gen0 = e2a.preprocess.split_hakilo(text)
+    gen0 = split_hakilo(text)
     for i, sentence in enumerate(gen0):
         yanked_from, yanked = yank_re(f'[{page_char}]', sentence)
         line = yanked_from+yanked
@@ -220,7 +220,7 @@ def do_translit(text):
 def preprocess_text(text, unspace: bool):
     str0 = '\xc2\xad'
     text = re.sub(f"[{str0}]", '', text)
-    text = re.sub('[\x0c]', e2a.types.page_char, text)
+    text = re.sub('[\x0c]', page_char, text)
     text = pp_remove_newlines(text)
     text = pp_break_paragraphs(text)
     text = pp_fix_formfeeds(text)

@@ -12,8 +12,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from loguru import logger
-from piper.voice import PiperVoice
-from platformdirs import user_cache_dir
 
 
 @dataclass(frozen=True)
@@ -21,17 +19,9 @@ class TTSConfig:
     model_name: str = "en_GB-alan-medium.onnx"
     bitrate_kbps: int = 64
 
-
 def _run(cmd: list[str]) -> None:
     logger.debug("Running: %s", " ".join(cmd))
     subprocess.run(cmd, check=True)
-
-
-def load_piper_voice(model_name: str = "en_GB-alan-medium.onnx") -> PiperVoice:
-    logger.debug("Loading Piper voice: %s", model_name)
-    model_dir = Path(user_cache_dir("ebook_to_audio")) / "models"
-    model_path = model_dir / model_name
-    return PiperVoice.load(model_path)
 
 def wav_duration_ms(path: Path) -> int:
     with wave.open(path.as_posix(), "rb") as f:
@@ -91,13 +81,6 @@ def encode_mp3(wav_path: Path, mp3_path: Path, bitrate_kbps: int = 64) -> Path:
         mp3_path.as_posix(),
     ])
     return mp3_path
-
-def load_piper_voice(model_name="en_GB-alan-medium.onnx"):
-    logger.debug('Loading voice...')
-    model_file_path = Path(user_cache_dir("ebook_to_audio"))
-    model_file_path = model_file_path / "models" / model_name
-    voice = PiperVoice.load(model_file_path)
-    return voice
 
 def synthesize_mp3(text: str, mp3_path: Path, voice: PiperVoice, bitrate_kbps: int = 64) -> Path:
     wav_path = mp3_path.with_suffix(".wav")

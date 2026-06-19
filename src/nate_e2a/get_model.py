@@ -10,16 +10,17 @@ from pathlib import Path
 
 import requests
 from loguru import logger
+from piper.voice import PiperVoice
 from platformdirs import user_cache_dir
 from tqdm import tqdm
 
 
 def get_model(outfile_name, download_url: str) -> Path:
-    outpath = user_cache_dir("ebook_to_audio")
+    outpath = user_cache_dir("nate_e2a")
     outpath = os.path.join(str(outpath), 'models')
     os.makedirs(outpath, exist_ok=True)
     outfile = os.path.join(outpath, outfile_name)
-    model_path = Path(user_cache_dir("ebook_to_audio"))
+    model_path = Path(user_cache_dir("nate_e2a"))
     model_path = model_path / "models" / outfile_name
 
     if model_path.exists():
@@ -47,7 +48,15 @@ def get_model(outfile_name, download_url: str) -> Path:
 
 def ensure_model_weights():
     weights_url = 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alan/medium/en_GB-alan-medium.onnx?download=true'
-    config_url = 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alan/medium/en_GB-alan-medium.onnx.json?download=true.json'
+    config_url = 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alan/medium/en_GB-alan-medium.onnx.json?download=true'
     path1 = get_model('en_GB-alan-medium.onnx', weights_url)
     path2 = get_model('en_GB-alan-medium.onnx.json', config_url)
     return path1
+
+
+def load_piper_voice(model_name="en_GB-alan-medium.onnx"):
+    logger.debug('Loading voice...')
+    model_file_path = Path(user_cache_dir("ebook_to_audio"))
+    model_file_path = model_file_path / "models" / model_name
+    voice = PiperVoice.load(model_file_path)
+    return voice

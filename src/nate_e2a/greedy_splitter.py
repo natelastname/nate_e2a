@@ -196,3 +196,16 @@ class GreedySentenceSplitter:
             return last_space
 
         return hard_hi
+
+
+def split_for_sylt(text: str) -> list[str]:
+    # Your current config (keep it stable)
+    conf = GreedySplitConfig(
+        max_len=320,
+        target_len=260,
+        min_len=50,
+        allow_early_cut_tier_index=0,
+    )
+    splitter = GreedySentenceSplitter(conf)
+    # Your old code replaced newlines with spaces
+    return splitter.split(text.replace("\n", " "))

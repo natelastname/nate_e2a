@@ -52,7 +52,6 @@ class RunArgs:
     unspace: bool = False
     run_mode: RunMode = RunMode.NORMAL
     rm_linearization: bool = False
-    gen_lrc: bool = True
 
 # ----------------------------- Utils ----------------------------------
 

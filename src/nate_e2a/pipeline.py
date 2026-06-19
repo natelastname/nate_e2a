@@ -11,19 +11,28 @@ import tempfile
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
-import ebook_to_audio as e2a
-from ebook_to_audio.types import RunArgs, TTSTrack
+from .get_toc.toc_epub import get_toc_epub
+from .get_toc.toc_pdf import get_toc_pdf
+from .greedy_splitter import split_for_sylt
+from .metadata import (
+    TrackMeta,
+    set_id3v2_tags_with_id3v2_cli,
+    sylt_to_lrc,
+    write_sylt,
+)
+from .tts import concat_wavs, encode_mp3, synthesize_wav, wav_duration_ms
+from .types import RunArgs, TTSTrack, page_char, pg_char, sentence_char
 
 
 def get_toc(args: RunArgs) -> Iterator[TTSTrack]:
     if str(args.infile).endswith("pdf"):
-        yield from e2a.toc_pdf.get_toc_pdf(args)
+        yield from get_toc_pdf(args)
         return
-    yield from e2a.toc_epub.get_toc_epub(args)
+    yield from get_toc_epub(args)
 
 
 def _strip_control_chars(text: str) -> str:
-    for ch in (e2a.types.sentence_char, e2a.types.pg_char, e2a.types.page_char):
+    for ch in (sentence_char, pg_char, page_char):
         text = text.replace(ch, "")
     return text
 
@@ -38,7 +47,7 @@ def synthesize_mp3_with_sylt(
     Build an MP3 by synthesizing each sentence separately,
     concatenating WAVs, then embedding SYLT timestamps.
     """
-    sentences = e2a.chunking.split_for_sylt(text)
+    sentences = split_for_sylt(text)
 
     with tempfile.TemporaryDirectory(prefix="e2a.sylt.") as td:
         td_path = Path(td)
@@ -53,9 +62,8 @@ def synthesize_mp3_with_sylt(
                 continue
             print(sent)
             wav_path = td_path / f"sent_{i:06d}.wav"
-            e2a.tts.synthesize_wav(sent, wav_path, voice)
-
-            dur_ms = e2a.tts.wav_duration_ms(wav_path)
+            synthesize_wav(sent, wav_path, voice)
+            dur_ms = wav_duration_ms(wav_path)
             lyrics.append((sent, curr_ms))
             curr_ms += dur_ms
             wavs.append(wav_path)
@@ -64,10 +72,10 @@ def synthesize_mp3_with_sylt(
             raise ValueError("No audio produced")
 
         full_wav = td_path / "full.wav"
-        e2a.tts.concat_wavs(wavs, full_wav)
-        e2a.tts.encode_mp3(full_wav, mp3_path, bitrate_kbps=bitrate_kbps)
+        concat_wavs(wavs, full_wav)
+        encode_mp3(full_wav, mp3_path, bitrate_kbps=bitrate_kbps)
 
-    e2a.metadata.write_sylt(mp3_path, lyrics)
+    write_sylt(mp3_path, lyrics)
     return mp3_path
 
 
@@ -75,17 +83,14 @@ def convert_text(
     chunk_gen: Iterable[TTSTrack],
     outpath: str | Path,
     artist: str,
-    voice: e2a.tts.PiperVoice,
+    voice: PiperVoice,
     *,
     no_metadata: bool = False,
-    gen_lrc: bool = True,
     bitrate_kbps: int = 64,
 ) -> None:
     outdir = Path(outpath)
     outdir.mkdir(parents=True, exist_ok=True)
-
     out_text_parts: list[str] = []
-
     for item_num, track in enumerate(chunk_gen, start=1):
         text = _strip_control_chars(track.text)
         if text.strip() == "":
@@ -100,14 +105,12 @@ def convert_text(
         print(f"[{item_num:03d}] TOC ITEM: {track.title}")
         print("=" * 80)
 
-        # 1) Synthesize MP3
-        if gen_lrc:
-            synthesize_mp3_with_sylt(track.text, final_mp3, voice=voice, bitrate_kbps=bitrate_kbps)
-        else:
-            e2a.tts.synthesize_mp3(text, final_mp3, voice, bitrate_kbps=bitrate_kbps)
+
+        synthesize_mp3_with_sylt(track.text, final_mp3, voice=voice, bitrate_kbps=bitrate_kbps)
+
 
         # 2) Metadata
-        meta = e2a.metadata.TrackMeta(
+        meta = TrackMeta(
             artist=artist,
             title=f"{z} {track.title}",
             album=artist,
@@ -115,13 +118,11 @@ def convert_text(
             description=f"Created {dt.datetime.now().isoformat(timespec='minutes')}",
         )
         if not no_metadata:
-            e2a.metadata.set_id3v2_tags_with_id3v2_cli(final_mp3, meta)
+            set_id3v2_tags_with_id3v2_cli(final_mp3, meta)
 
-        if gen_lrc:
-            e2a.metadata.sylt_to_lrc(final_mp3, title=meta.title, artist=meta.artist)
+        sylt_to_lrc(final_mp3, title=meta.title, artist=meta.artist)
 
-        out_text_parts.append(text + e2a.types.page_char + "\n")
+        out_text_parts.append(text + page_char + "\n")
 
     (outdir / "00-text.txt").write_text("".join(out_text_parts), encoding="utf-8")
-
 
