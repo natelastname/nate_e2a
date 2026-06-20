@@ -56,7 +56,7 @@ def ensure_model_weights():
 
 def load_piper_voice(model_name="en_GB-alan-medium.onnx"):
     logger.debug('Loading voice...')
-    model_file_path = Path(user_cache_dir("ebook_to_audio"))
+    model_file_path = Path(user_cache_dir("nate_e2a"))
     model_file_path = model_file_path / "models" / model_name
     voice = PiperVoice.load(model_file_path)
     return voice
