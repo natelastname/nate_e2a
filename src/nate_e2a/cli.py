@@ -5,12 +5,12 @@ Created on 2024-12-08T10:04:25-05:00
 @author: nate
 """
 import atexit
+import dataclasses
 import shlex
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Iterable, Optional
-
 import argh
 from loguru import logger
 
@@ -58,13 +58,14 @@ def strip_linearization_to_temp(input_pdf: Path) -> Path:
 def _coerce_suffix(p: Path) -> str:
     return p.suffix.lower().lstrip(".")
 
-def _maybe_strip_pdf(args: RunArgs) -> None:
+def _maybe_strip_pdf(args: RunArgs) -> RunArgs:
     p = Path(args.infile)
     if args.rm_linearization and _coerce_suffix(p) == "pdf":
         logger.info("Stripping PDF linearization…")
         stripped = strip_linearization_to_temp(p)
-        args.infile = str(stripped)
         logger.info("Linearization stripped to temp: {}", stripped)
+        return dataclasses.replace(args, infile=str(stripped))
+    return args
 
 # --------------------------- generator selection ------------------------
 
@@ -96,8 +97,7 @@ def get_chunk_generator(args: RunArgs, infile: Path):
             with tempfile.TemporaryDirectory(prefix="e2a.") as tempdir:
                 converted = Path(tempdir) / f"{infile.stem}.epub"
                 run(["ebook-convert", str(infile), str(converted)])
-                args0 = dataclasses.replace(args)
-                args0.infile = str(converted)
+                args0 = dataclasses.replace(args, infile=str(converted))
                 yield from get_toc_epub(args0)
 
         return converted_generator()
@@ -168,7 +168,7 @@ def split_txt(
         rm_linearization=rm_linearization,
     )
 
-    _maybe_strip_pdf(runargs)
+    runargs = _maybe_strip_pdf(runargs)
 
     chunk_gen = get_chunk_generator(runargs, Path(runargs.infile))
     outfile = plain_outfile(out_root, Path(runargs.infile))
@@ -205,7 +205,7 @@ def tts(
         rm_linearization=rm_linearization,
     )
 
-    _maybe_strip_pdf(runargs)
+    runargs = _maybe_strip_pdf(runargs)
 
     # Print-only / debug modes
     if runargs.run_mode != RunMode.NORMAL:
