@@ -11,10 +11,11 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Iterable, Optional
+
 import argh
 from loguru import logger
 
-from .get_model import ensure_model_weights, load_piper_voice
+from .get_model import DEFAULT_VOICE, load_piper_voice
 from .get_toc import get_toc_epub, get_toc_pdf, get_toc_txt
 from .outpath_generator import gen_outpath
 from .pipeline import convert_text
@@ -70,16 +71,7 @@ def _maybe_strip_pdf(args: RunArgs) -> RunArgs:
 # --------------------------- generator selection ------------------------
 
 def get_chunk_generator(args: RunArgs, infile: Path):
-    """
-    Decide how to produce TTSTrack chunks given the input file.
-    This should stay thin; ideally it moves into ebook_to_audio.pipeline later.
-    """
-
-
-def get_chunk_generator(args: RunArgs, infile: Path):
-    """
-    Decide how to produce TTSTrack chunks given the input file.
-    """
+    """Decide how to produce TTSTrack chunks for the input file."""
     suffix = _coerce_suffix(infile)
 
     if suffix == "pdf":
@@ -103,6 +95,7 @@ def get_chunk_generator(args: RunArgs, infile: Path):
         return converted_generator()
 
     raise ValueError(f"No chunk generator for '*.{suffix}' files.")
+
 # --------------------------- outpath helpers ----------------------------
 
 def ensure_outdir(base_outpath: Optional[Path], infile: Path) -> tuple[str, Path]:
@@ -183,6 +176,7 @@ def tts(
     infile: str,
     *,
     outpath: Optional[str] = None,
+    voice: str = DEFAULT_VOICE,
     toc_strat: TOCStrat = TOCStrat.DEFAULT,
     unspace: bool = False,
     run_mode: RunMode = RunMode.NORMAL,
@@ -191,8 +185,6 @@ def tts(
     """
     TTS pipeline.
     """
-    ensure_model_weights()
-
     src = Path(infile).resolve()
     out_root = Path(outpath).resolve() if outpath else None
 
@@ -224,12 +216,12 @@ def tts(
 
     album, final_outdir = ensure_outdir(out_root, Path(runargs.infile))
     chunk_gen = get_chunk_generator(runargs, Path(runargs.infile))
-    voice = load_piper_voice()
+    piper_voice = load_piper_voice(voice)
     convert_text(
         chunk_gen,
         str(final_outdir),
         album,
-        voice,
+        piper_voice,
         bitrate_kbps=64
     )
 
