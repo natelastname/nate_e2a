@@ -13,31 +13,44 @@ from piper.voice import PiperVoice
 from platformdirs import user_cache_dir
 from tqdm import tqdm
 
-DEFAULT_VOICE = "en_GB-alan-medium"
-PIPER_VOICE_RELEASE = "v1.0.0"
-PIPER_VOICE_ROOT = "https://huggingface.co/rhasspy/piper-voices/resolve"
+
+DEFAULT_VOICE = "alan"
+VOICE_SPECS = {
+    "alan": {
+        "model_filename": "en_GB-alan-medium.onnx",
+        "config_filename": "en_GB-alan-medium.onnx.json",
+        "weights_url": (
+            "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/"
+            "en/en_GB/alan/medium/en_GB-alan-medium.onnx?download=true"
+        ),
+        "config_url": (
+            "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/"
+            "en/en_GB/alan/medium/en_GB-alan-medium.onnx.json?download=true"
+        ),
+    },
+    "joe": {
+        "model_filename": "en_US-joe-medium.onnx",
+        "config_filename": "en_US-joe-medium.onnx.json",
+        "weights_url": (
+            "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/"
+            "en/en_US/joe/medium/en_US-joe-medium.onnx?download=true"
+        ),
+        "config_url": (
+            "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/"
+            "en/en_US/joe/medium/en_US-joe-medium.onnx.json?download=true"
+        ),
+    },
+}
 
 
-def voice_base_url(voice: str) -> str:
-    """Return the download URL stem for a standard Piper voice ID."""
+def _voice_spec(voice: str) -> dict[str, str]:
     try:
-        locale, remainder = voice.split("-", 1)
-        speaker, quality = remainder.rsplit("-", 1)
-    except ValueError as exc:
+        return VOICE_SPECS[voice]
+    except KeyError as exc:
+        available = ", ".join(sorted(VOICE_SPECS))
         raise ValueError(
-            f"Invalid Piper voice {voice!r}; expected e.g. 'en_US-joe-medium'"
+            f"Unknown voice {voice!r}. Available voices: {available}"
         ) from exc
-
-    if "_" not in locale or not speaker or not quality:
-        raise ValueError(
-            f"Invalid Piper voice {voice!r}; expected e.g. 'en_US-joe-medium'"
-        )
-
-    language = locale.split("_", 1)[0]
-    return (
-        f"{PIPER_VOICE_ROOT}/{PIPER_VOICE_RELEASE}/"
-        f"{language}/{locale}/{speaker}/{quality}/{voice}"
-    )
 
 
 def get_model(outfile_name: str, download_url: str) -> Path:
@@ -68,13 +81,12 @@ def get_model(outfile_name: str, download_url: str) -> Path:
 
 
 def ensure_model_weights(voice: str = DEFAULT_VOICE) -> Path:
-    base_url = voice_base_url(voice)
-    model_name = f"{voice}.onnx"
-    model_path = get_model(model_name, f"{base_url}.onnx?download=true")
-    get_model(f"{model_name}.json", f"{base_url}.onnx.json?download=true")
+    spec = _voice_spec(voice)
+    model_path = get_model(spec["model_filename"], spec["weights_url"])
+    get_model(spec["config_filename"], spec["config_url"])
     return model_path
 
 
 def load_piper_voice(voice: str = DEFAULT_VOICE) -> PiperVoice:
-    logger.debug("Loading voice {}...", voice)
+    logger.debug("Loading voice '{}'...", voice)
     return PiperVoice.load(ensure_model_weights(voice))
